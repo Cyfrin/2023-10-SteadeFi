@@ -2,7 +2,7 @@
 
 <br/>
 <p align="center">
-<img src="https://res.cloudinary.com/droqoz7lg/image/upload/w_0.5,c_scale/v1697643709/company/oozpv8mdkwfbdotqknfz.png" width="500" alt="SteadeFi">
+<img src="https://res.cloudinary.com/droqoz7lg/image/upload/w_0.5,c_scale/v1697645540/Steadefi_Vertical_Dark_jd0wsq.png" width="500" alt="SteadeFi">  
 </p>
 <br/>
 
