@@ -1,67 +1,30 @@
 # Technical Documentation
-More explanation of technical diagrams and flows here.
 
 # Table of Contents
 - [Protocol Overview](#protocol-overview)
   - [Actors](#actors)
-  - [Strategy Vaults](#strategy-vaults)
-    - [Delta Long](#delta-long)
-    - [Delta Neutral](#delta-neutral)
-    - [Automated Rebalancing](#automated-rebalancing)
-  - [Lending Vaults](#lending-vaults)
-    - [Profit Sharing Rates](#profit-sharing-rates)
-- [Technical Overview](#technical-overview)
-  - [High Level System Architecture](#high-level-system-architecture)
-- [Lending Vault Technical Overview](#lending-vault-technical-overview)
-  - [Lending Vault Class Diagram](#lending-vault-class-diagram)
+- [Lending Vaults](#lending-vaults)
+  - [Profit Sharing Rates](#profit-sharing-rates)
   - [Lending Vault Actions](#lending-vault-actions)
-- [Strategy Vault Technical Overview](#strategy-vault-technical-overview)
-  - [Strategy Vault Class Diagram](#strategy-vault-class-diagram)
+- [Strategy Vaults](#strategy-vaults)
+  - [Delta Long](#delta-long)
+  - [Delta Neutral](#delta-neutral)
+  - [Automated Rebalancing](#automated-rebalancing)
+  - [GMX v2 High Level Sequence](#gmx-v2-high-level-sequence)
+  - [Strategy Vault Contracts Architecture](#strategy-vault-contracts-architecture)
   - [Strategy Vault Actions](#strategy-vault-actions)
   - [Strategy Vault Sequence Diagrams](#strategy-vault-sequence-diagrams)
-    - [Strategy Vault Deposit Sequence Flow](#strategy-vault-deposit-sequence-flow)
-    - [Strategy Vault Withdraw Sequence Flow](#strategy-vault-withdraw-sequence-flow)
-    - [Strategy Vault Rebalance Add Sequence Flow](#strategy-vault-rebalance-add-sequence-flow)
-    - [Strategy Vault Rebalance Remove Sequence Flow](#strategy-vault-rebalance-remove-sequence-flow)
-    - [Strategy Vault Compound Sequence Flow](#strategy-vault-compound-sequence-flow)
-    - [Strategy Vault Emergency Sequence Flow](#strategy-vault-emergency-sequence-flow)
+
+<br>
 
 # Protocol Overview
 There are 2 types of vaults: **Lending Vaults** and **Strategy Vaults**.
 
 A typical set up for 3x Leverage, Delta Long and Delta Neutral strategies to the ETH-USDC GM LP pool on GMXv2, with isolated ETH and USDC lending vaults are as follows:
 
-```mermaid
-graph TD
-  SVL["3x Long ETH-USDC GMX"]
-  SVN["3x Neutral ETH-USDC GMX"]
-  LVE["ETH Lending Vault"]
-  LVU["USDC Lending Vault"]
-  L(("Lender"))
-  D(("Depositor"))
-
-  style SVL fill:blue,stroke:blue,color:white
-  style SVN fill:blue,stroke:blue,color:white
-  style LVE fill:blue,stroke:blue,color:white
-  style LVU fill:blue,stroke:blue,color:white
-  style L fill:green,stroke:green,color:white
-  style D fill:green,stroke:green,color:white
-
-  D <--->|Deposit/Withdraw ETH/USDC/ETH-USDC LP| SVL
-  D <--->|Deposit/Withdraw ETH/USDC/ETH-USDC LP| SVN
-
-  SVL <--->|Borrow/Repay USDC for Leverage| LVU
-  SVN <--->|Borrow/Repay USDC for Leverage| LVU
-  SVN <--->|Borrow/Repay ETH for Delta Hedging| LVE
-
-  LVE <--->|Deposit/Withdraw ETH| L
-  LVU <--->|Deposit/Withdraw USDC| L
-```
+![Protocol Overview](/docs/img/protocol-overview.png)
 
 > Note that Delta Long strategies borrow only USDC for more leverage, while Delta Neutral strategies borrow both USDC for leverage **as well as** borrow ETH in order to delta hedge the ETH exposure of the liquidity provided to the ETH-USDC GM LP pool (borrowing = hedging).
-
-### Steadefi Front-End Interface Screenshot
-![Lending and Strategy Vaults Setup](./img/lending-strategy-vaults-screenshot.png)
 
 
 ## Actors
@@ -73,66 +36,9 @@ graph TD
 | Owner | Owner are administrators that have rights to configure and update various sensitive vault configurations and parameters. Owners of deployed smart-contracts (vaults, oracles, etc.) should be Timelocks of which are managed by Multi-Sigs that require at least a 2 out of 3 signing approval for any transactions to happen with a 24 hours delay. Note that on contract deployment, the immediate Owner is the hot wallet deployer account. After deploying and initial configuration of the contract, the ownership should be immediately transferred from the hot wallet deployer to a Timelock managed by a Multi-Sig. |
 
 
-## Strategy Vaults
-**Strategy vaults** are multi-asset vaults that carry out a particular yield-earning strategy via taking on under-collaterised borrowing from lending vaults. Strategy vaults earn yield by collecting fees by providing its' assets to external protocols for usage, typically in the form of swap/trading/lending/staking liqudity.
+<br>
 
-**Strategy vaults** can vary by:
-- Leverage (3x, 5x, etc.)
-- Delta (Delta Long or Delta Neutral to the underlying volatile asset(s))
-- Yield Source(s) (Usually by providing liqudiity to Automated Market Makers, Perpetual Exchanges, Liquid Staking)
-- Underlying Assets (ETH, WBTC, USDC, etc.)
-
-> *Delta refers to the directional risk associated with the price movements of an underlying asset.*
-
-### Delta Long
-A Delta Long strategy (also known as Delta 1) means that the USD value of your position would be directly correlated with the price movement of an underlying asset (i.e. if the asset's price increases, your position value should also increase, and vice versa).
-
-Example:
-1) Price of ETH is USD $1000 and price of 1 USDC is USD $1. The value of a ETH-USDC LP token with 50% token weight in ETH and 50% in USDC is USD $1.
-2) A depositor deposits 1 USDC (equity value) to a 3x Long ETH-USDC strategy vault, which borrows 2 USDC (debt value) for a total of 3 USDC (asset value), which it then adds liquidity for 3 ETH-USDC LP tokens.
-3a) If the price of ETH increases 50% to USD $1500, the value of the ETH-USDC LP token should increase by 25% to $1.25. The asset value of the vault would be $3.75, the debt value still remains at $2 and the equity value is $1.75 (asset - debt), effectively earning a 75% return on equity before paying borrow interest or accounting for earned yield.
-3b) If the price of ETH decreases 50% to USD $500, the value of the ETH-USDC LP token should decrease by 25% to $0.75. The asset value of the vault would be $2.25, the debt value still remains at $2 and the equity value is $0.25 (asset - debt), effectively losing 75% on equity before paying borrow interest or accounting for earned yield.
-
-> *If you hold the belief that the price of the volatile asset is mostly going up over time, it is more beneficial to deposit in a Leveraged Delta Long strategy.*
-
-### Delta Neutral
-A Delta Neutral strategy (also known as Delta 0) means that the USD value of your position value is not directly correlated with the price movement of an underlying asset (i.e. if the asset's price increases OR decreases, your position value does not increase OR decrease as significantly as the price changes both-ways are hedged).
-
-Example:
-1) Price of ETH is USD $1000 and price of 1 USDC is USD $1. The value of a ETH-USDC LP token with 50% token weight in ETH and 50% in USDC is USD $1.
-2) A depositor deposits 1 USDC (equity value) to a 3x Neutral ETH-USDC strategy vault, which borrows $1.50 USD worth of ETH (to hedge out the total ETH amount of $1.50 in the final $3 asset value position) and 0.50 USDC (for a combined debt value of $2) for a total of 3 USD worth of assets (asset value), which it then adds liquidity for 3 ETH-USDC LP tokens.
-3a) If the price of ETH increases 50% to USD $1500, the value of the ETH-USDC LP token should increase by 25% to $1.25. The asset value of the vault would be $3.75, the debt value would be $2.375 ($1.50 -> $1.875 ETH + $0.50 USDC) and the equity value is $1.375 (asset - debt), effectively earning a 37.5% return on equity before paying borrow interest or accounting for earned yield.
-3b) If the price of ETH decreases 50% to USD $500, the value of the ETH-USDC LP token should decrease by 25% to $0.75. The asset value of the vault would be $2.25, the debt value will decrease to $1.25 ($1.50 -> $0.75 ETH + $0.50 USDC) and the equity value is $1 (asset - debt), effectively having a 0%  gain/loss on equity before paying borrow interest or accounting for earned yield. In this scenario, if the yield earned is higher than the borrow interest, the depositor will make a positive return despite the price of ETH decreasing by 50%.
-
-> *If you hold the belief that the price of the volatile asset is going to stay within a range (crabbish) or perhaps would even decrease slightly over time, it is more beneficial to deposit in a Leveraged Delta Neutral strategy.*
-
-**Depositors** can deposit accepted assets into strategy vaults in exchange for shares of the **Strategy Vault (svToken)**.
-
-**Keepers** regularly check and maintain every vault's target leverage and delta strategy. This means that depositors to these strategy vaults do not have to manually manage their own position's strategy.
-
-The benefits to Depositors are:
-- Earn higher yields due to under-collaterised borrowing with the same amount of assets owned
-- 24/7 automated strategy rebalancing instead of manual rebalancing
-- No liquidation
-- Auto-compounding of yields earned
-- No negative yield (i.e. no risk of borrow rates being higher than yield earning rates). See *Profit Sharing Rates* section for more details.
-
-Here is an animated screenshot showing the price charts of delta long and neutral strategies. The bright green line is the value of a vault token share (svTokenValue), while the other coloured lines are referencing the price changes of the underlying assets (in the case of GLP, it consists of mainly BTC, ETH and USD stablecoins):
-
-![Price chart of Delta Long and Delta Neutral Strategy](https://steadefi.com/landing/3LN-GLP.gif)
-
-### Automated Rebalancing
-A leverage delta strategy will change over time due to changes in the volatile asset price, borrow interest rates and yield earning rates.
-
-This results in a strategy's debt ratio and/or delta to possibly "drift" too far from it's intended target leverage and delta strategy. Depending on how things play out, such drifts "away" from the intended target strategy could also back to it's target (good), but could also drift even further (not good as it is not executing on its intended strategy).
-
-As such, constant maintainence of a vault's strategy should be adhered to in order to keep its integrity over a period of time to allow for a safer and more reliable yield earning strategy.
-
-Steadefi strategy vaults have min/max parameters for debt ratio and delta. Keepers will constantly check if the strategy vaults have exceeded these parameters, and if so, automatically trigger a rebalance such that the vault's debt ratio and delta is reset back to it's intended target leverage and delta hedge.
-
-Note that the intention is not to over-rebalance, as every rebalance incurs a cost to the strategy vault. As such, the parameters set for every vault in order to determine when a vault should rebalance comes from the team's quant research and experience on a best effort basis, and depending on market conditions, may be updated over time.
-
-## Lending Vaults
+# Lending Vaults
 Lending vaults are single asset vaults that lend out its' assets to strategy vaults to allow strategy vaults to carry out their intended strategy. Lending vaults's yield come from charging interest to strategy vaults for assets borrowed.
 
 Steadefi implements **Isolated Lending Vaults** to cater to different strategy vaults. Although this fragments lending asset liquidity (e.g. there can be mutliple USDC Lending Vaults), this further isolates risks to both Lenders and Depositors, and allow Lenders to more granularly decide the yield (and corresponding risk) of their assets being lent out to strategies.
@@ -148,7 +54,7 @@ The benefits to Lenders are:
 **Keepers** regularly check and update every lending vault's borrow interest rates based on the Yield APR of the strategy vault's that is borrowing assets from it. See *Profit Sharing Rates* section for more details.
 
 
-### Profit Sharing Rates
+## Profit Sharing Rates
 Most existing DeFi Lending Vaults uses a Utilization Rate model to determine their borrow rates.
 
 For borrowers (strategy vaults), the largest concern with the “utilization rate” system is the potential negative APRs on their position. In this case, the borrowing rates would be higher than their yields, effectively putting them in a losing position until more lending funds are deposited or borrowers reduce their position. As it does not make sense for borrowers to have negative yield, such situations may ultimately reduce the demand for borrows in the long-run, which overall reduces the interest earned to lenders.
@@ -162,145 +68,6 @@ Steadefi implements a Profit Sharing Model that aim to address the above issues 
 The adjustment is done by automated **Keepers**.
 
 This effectively results in a "profit sharing" situation, where lenders stand to earn higher returns when yields are high for strategy vaults (beneficial to lenders) but may also earn lower returns when yields are low for strategy vaults (beneficial to strategy vaults, which keeps them borrowing for longer rather than leaving).
-
-<br>
-
-# Technical Overview
-Here is a high level technical architecture that shows the various components (smart-contracts, external protocols, keepers, back-end infrastructure, etc.) and how they interact with each other.
-
-Steadefi runs a centralised CRON service and Back-End API to obtain vaults' data, and stores them in a centralised Database. This data is used for displaying the historical charts of the vault on Steadefi's front-end interface.
-
-Keepers (using OpenZeppelin Defender Relayers and Autotasks) are also ran that performs tasks such as adjusting the borrow rates of lending vaults as well as compounding and rebalancing strategy vaults (when needed).
-
-*(Not shown in graph)* All smart contracts are owned by a Timelock, of which it is controlled by a Multi-Sig with at least 2 out of 3 signers required for owner-only changes. Signers are hardware wallets of diferent individuals of the Steadefi team.
-
-## High Level System Architecture
-
-```mermaid
----
-title: Steadefi High Level System Architecture
----
-graph TD
-  CPF[["Chainlink Price Feeds"]]
-  P[["Protocol (Yield Source e.g. GMX)"]]
-  CO["Chainlink Oracle"]
-  PO["Protocol Oracle"]
-  SV["Strategy Vault"]
-  LV["Lending Vault"]
-  K("Keeper")
-  CR("CRON")
-  DB[("Database")]
-  SW["Protocol Swap"]
-  AMM[["AMM e.g. Uniswap"]]
-  U(("User"))
-
-  style SV fill:blue,stroke:blue,color:white
-  style LV fill:blue,stroke:blue,color:white
-  style PO fill:blue,stroke:blue,color:white
-  style SW fill:blue,stroke:blue,color:white
-  style CO fill:blue,stroke:blue,color:white
-  style U fill:green,stroke:green,color:white
-  style P fill:brown,stroke:brown,color:white
-  style CPF fill:brown,stroke:brown,color:white
-  style AMM fill:brown,stroke:brown,color:white
-  style CR fill:navy,stroke:navy,color:white
-  style K fill:navy,stroke:navy,color:white
-  style DB fill:navy,stroke:navy,color:white
-
-  U <--->|Deposit/Withdraw assets| LV
-  U <--->|Deposit/Withdraw assets| SV
-
-  CO -.->|Get Asset Price| CPF
-
-  SV <-->|Borrow/Repay assets| LV
-  SV -..->|Get Asset Price| CO
-  SV -..->|Get LP Price| PO
-  PO -..->|Get Asset Price| CO
-
-  SV <--->|Add/Remove Liquidity/Stake| P
-  SV <-->|Swap Assets for Repay/Rebalance| SW
-  SW <-->|Swap Assets| AMM
-
-  K <-->|Update Interest Rate Model| LV
-  K <-->|Compound/Rebalance/Emergency Pause/Resume/Shutdown| SV
-  K -.->|Reads Data| DB
-
-  CR -..->|Gets Data| LV
-  CR -..->|Gets Data| SV
-  CR --->|Updates Data| DB
-
-```
-
-<br>
-
-# Lending Vault Technical Overview
-
-## Lending Vault Class Diagram
-
-```mermaid
----
-title: Lending Vault Class Diagram
----
-classDiagram
-    direction LR
-    class LendingVault {
-        +asset
-        +isNativeAsset
-        +treasury
-        +totalBorrows
-        +totalBorrowDebt
-        +performanceFee
-        +vaultReserves
-        +lastUpdatedAt
-        +maxCapacity
-        +interestRate
-        +maxInterestRate
-
-        +borrowers[]
-        +keepers[]
-
-        ~onlyBorrower()
-        ~onlyKeeper()
-
-        +totalAsset()
-        +totalAvailableAsset()
-        +utilizationRate()
-        +lvTokenValue()
-        +borrowAPR()
-        +lendingAPR()
-        +maxRepay()
-        +depositNative()
-        +deposit()
-        +withdraw()
-        +borrow()
-        +repay()
-        +withdrawReserve()
-
-        ~_onlyBorrower()
-        ~_onlyKeeper()
-        ~_mintShares()
-        ~_burnShares()
-        ~_updateVaultWithInterestsAndTimestamp()
-        ~_pendingInterest()
-        ~_to18ConversionFactor()
-        ~_calculateInterestRate()
-
-        #updateInterestRate()
-        #updatePerformanceFee()
-        #approveBorrower()
-        #revokeBorrower()
-        #updateKeeper()
-        #emergencyRepay()
-        #emergencyShutdown()
-        #emergencyResume()
-        #updateMaxCapacity()
-        #updateMaxInterestRate()
-        #updateTreasury()
-
-        +receive()
-    }
-
-```
 
 ## Lending Vault Actions
 All actions possible to a Lending Vault and their expected outcome and impact, grouped by access to roles.
@@ -337,297 +104,113 @@ All actions possible to a Lending Vault and their expected outcome and impact, g
 | Any | lendingAPR | Returns current interest rate yield given to lenders |
 | Any | maxRepay | Returns maximum amount repayable by a borrower
 
+
 <br>
 
-# Strategy Vault Technical Overview
+# Strategy Vaults
+**Strategy vaults** are multi-asset vaults that carry out a particular yield-earning strategy via taking on under-collaterised borrowing from lending vaults. Strategy vaults earn yield by collecting fees by providing its' assets to external protocols for usage, typically in the form of swap/trading/lending/staking liqudity.
 
-## Strategy Vault Class Diagram
+**Strategy vaults** can vary by:
+- Leverage (3x, 5x, etc.)
+- Delta (Delta Long or Delta Neutral to the underlying volatile asset(s))
+- Yield Source(s) (Usually by providing liqudiity to Automated Market Makers, Perpetual Exchanges, Liquid Staking)
+- Underlying Assets (ETH, WBTC, USDC, etc.)
 
-```mermaid
----
-title: GMX Strategy Vault Class Diagram
----
-classDiagram
-    direction LR
+> *Delta refers to the directional risk associated with the price movements of an underlying asset.*
 
-    class GMXTypes {
-      struct Store
-      struct DepositCache
-      struct WithdrawCache
-      struct CompoundCache
-      struct RebalanceCache
-      struct DepositParams
-      struct WithdrawParams
-      struct CompoundParams
-      struct RebalanceAddParams
-      struct RebalanceRemoveParams
-      struct BorrowParams
-      struct RepayParams
-      struct HealthParams
-      struct AddLiquidityParams
-      struct RemoveLiquidityParams
+## Delta Long
+A Delta Long strategy (also known as Delta 1) means that the USD value of your position would be directly correlated with the price movement of an underlying asset (i.e. if the asset's price increases, your position value should also increase, and vice versa).
 
-      enum Status
-      enum Delta
-      enum RebalanceType
-    }
+Example:
+1) Price of ETH is USD $1000 and price of 1 USDC is USD $1. The value of a ETH-USDC LP token with 50% token weight in ETH and 50% in USDC is USD $1.
+2) A depositor deposits 1 USDC (equity value) to a 3x Long ETH-USDC strategy vault, which borrows 2 USDC (debt value) for a total of 3 USDC (asset value), which it then adds liquidity for 3 ETH-USDC LP tokens.
+3) **If the price of ETH increases** 50% to USD $1500, the value of the ETH-USDC LP token should increase by 25% to $1.25. The asset value of the vault would be $3.75, the debt value still remains at $2 and the equity value is $1.75 (asset - debt), effectively earning a 75% return on equity before paying borrow interest or accounting for earned yield.
+4) **If the price of ETH decreases** 50% to USD $500, the value of the ETH-USDC LP token should decrease by 25% to $0.75. The asset value of the vault would be $2.25, the debt value still remains at $2 and the equity value is $0.25 (asset - debt), effectively losing 75% on equity before paying borrow interest or accounting for earned yield.
 
-    class GMXVault {
-      ~_store
+> *If you hold the belief that the price of the volatile asset is mostly going up over time, it is more beneficial to deposit in a Leveraged Delta Long strategy.*
 
-      +keepers[]
-      +tokens[]
+## Delta Neutral
+A Delta Neutral strategy (also known as Delta 0) means that the USD value of your position value is not directly correlated with the price movement of an underlying asset (i.e. if the asset's price increases OR decreases, your position value does not increase OR decrease as significantly as the price changes both-ways are hedged).
 
-      ~onlyVault()
-      ~onlyKeeper()
+Example:
+1) Price of ETH is USD $1000 and price of 1 USDC is USD $1. The value of a ETH-USDC LP token with 50% token weight in ETH and 50% in USDC is USD $1.
+2) A depositor deposits 1 USDC (equity value) to a 3x Neutral ETH-USDC strategy vault, which borrows $1.50 USD worth of ETH (to hedge out the total ETH amount of $1.50 in the final $3 asset value position) and 0.50 USDC (for a combined debt value of $2) for a total of 3 USD worth of assets (asset value), which it then adds liquidity for 3 ETH-USDC LP tokens.
+3) **If the price of ETH increases** 50% to USD $1500, the value of the ETH-USDC LP token should increase by 25% to $1.25. The asset value of the vault would be $3.75, the debt value would be $2.375 ($1.50 -> $1.875 ETH + $0.50 USDC) and the equity value is $1.375 (asset - debt), effectively earning a 37.5% return on equity before paying borrow interest or accounting for earned yield.
+4) **If the price of ETH decreases** 50% to USD $500, the value of the ETH-USDC LP token should decrease by 25% to $0.75. The asset value of the vault would be $2.25, the debt value will decrease to $1.25 ($1.50 -> $0.75 ETH + $0.50 USDC) and the equity value is $1 (asset - debt), effectively having a 0%  gain/loss on equity before paying borrow interest or accounting for earned yield. In this scenario, if the yield earned is higher than the borrow interest, the depositor will make a positive return despite the price of ETH decreasing by 50%.
 
-      +store()
-      +isTokenWhitelisted()
-      +svTokenValue()
-      +pendingFee()
-      +valueToShares()
-      +convertToUsdValue()
-      +tokenWeights()
-      +assetValue()
-      +debtValue()
-      +equityValue()
-      +assetAmt()
-      +debtAmt()
-      +lpAmt()
-      +leverage()
-      +delta()
-      +debtRatio()
-      +additionalCapacity()
-      +capacity()
+> *If you hold the belief that the price of the volatile asset is going to stay within a range (crabbish) or perhaps would even decrease slightly over time, it is more beneficial to deposit in a Leveraged Delta Neutral strategy.*
 
-      +deposit()
-      +depositNative()
-      +withdraw()
-      +emergencyWithdraw()
-      +mintFee()
+**Depositors** can deposit accepted assets into strategy vaults in exchange for shares of the **Strategy Vault (svToken)**.
 
-      ~_onlyVault()
-      ~_onlyKeeper()
+**Keepers** regularly check and maintain every vault's target leverage and delta strategy. This means that depositors to these strategy vaults do not have to manually manage their own position's strategy.
 
-      #processDeposit()
-      #processDepositCancellation()
-      #processDepositFailure()
-      #processDepositFailureLiquidityWithdrawal()
+The benefits to Depositors are:
+- Earn higher yields due to under-collaterised borrowing with the same amount of assets owned
+- 24/7 automated strategy rebalancing instead of manual rebalancing
+- No liquidation
+- Auto-compounding of yields earned
+- No negative yield (i.e. no risk of borrow rates being higher than yield earning rates). See *Profit Sharing Rates* section for more details.
 
-      #processWithdraw()
-      #processWithdrawCancellation()
-      #processWithdrawFailure()
-      #processWithdrawFailureLiquidityAdded()
+## Automated Rebalancing
+A leverage delta strategy will change over time due to changes in the volatile asset price, borrow interest rates and yield earning rates.
 
-      #rebalanceAdd()
-      #processRebalanceAdd()
-      #rebalanceRemove()
-      #rebalanceRemoveCancellation()
+This results in a strategy's debt ratio and/or delta to possibly "drift" too far from it's intended target leverage and delta strategy. Depending on how things play out, such drifts "away" from the intended target strategy could also back to it's target (good), but could also drift even further (not good as it is not executing on its intended strategy).
 
-      #compound()
-      #processCompoundAdd()
-      #processCompoundCancellation()
+As such, constant maintainence of a vault's strategy should be adhered to in order to keep its integrity over a period of time to allow for a safer and more reliable yield earning strategy.
 
-      #emergencyPause
-      #emergencyResume
-      #processEmergencyResume
-      #emergencyClose
+Steadefi strategy vaults have min/max parameters for debt ratio and delta. Keepers will constantly check if the strategy vaults have exceeded these parameters, and if so, automatically trigger a rebalance such that the vault's debt ratio and delta is reset back to it's intended target leverage and delta hedge.
 
-      #updateKeeper()
-      #updateTreasury()
-      #updateSwapRouter()
-      #updateCallback()
-      #updatefeePerSecond()
-      #updateParameterLimits()
-      #updateMinSlippage()
-      #updateMinExecutionFee()
+Note that the intention is not to over-rebalance, as every rebalance incurs a cost to the strategy vault. As such, the parameters set for every vault in order to determine when a vault should rebalance comes from the team's quant research and experience on a best effort basis, and depending on market conditions, may be updated over time.
 
-      #mint()
-      #burn()
+## GMX v2 High Level Sequence
 
-      +receive()
-    }
+Unlike most existing DeFi protocols, GMX version 2 features a "2 step" process for various asset transfer transactions:
+- adding liquidity (buy GM tokens)
+- removing liquidity (sell GM tokens)
+- swaps (swapping assets in a GM pool; this is not used in Steadefi's existing vaults)
 
-    class GMXCallback {
-      +vault
-      +roleStore
+A high level diagram explaining the flow is as follows (note that this is an unofficial diagram from Steadefi so only take this as an illustrative diagram):
 
-      ~onlyController
+![GMX v2 High Level Sequence](./img/gmx-v2-high-level-sequence.png)
 
-      #afterDepositExecution()
-      #afterDepositCancellation()
-      #afterWithdrawalExecution()
-      #afterWithdrawalCancellation()
-    }
+As such, Steadefi's vaults have to be designed to handle this 2 transaction process in order to correctly and automatically handle successful (and failed) transactions.
 
-    class GMXDeposit {
-      event DepositCreated
-      event DepositCompleted
-      event DepositCancelled
-      event DepositFailed
+For example, when a Depositor is depositing to a Vault which will add liquidity to GMX to ETH-USDC GM pool:
 
-      +deposit()
-      +processDeposit()
-      +processDepositCancellation()
-      +processDepositFailure()
-      +processDepositFailureLiquidityWithdrawal()
-    }
+- First transaction:
+  - Deposit calls `deposit()` to Vault and sends deposit tokens
+  - Vault will send deposit tokens (e.g. USDC) to ExchangeRouter
+  - Vault will send native gas tokens for execution fee (e.g. ETH) to ExchangeRouter
+  - Vault will send a `createDeposit()` transaction with `CreateDepositParams` to ExchangeRouter
+- GMX keepers will execute the 2nd transaction:
+  - Swaps deposit tokens for LP (ETH-USDC GM) tokens
+  - Sends LP tokens to Vault
+  - Calls `afterDepositExecution()` to callback contract address of Vault (if successful deposit)
+    - Vault computes how many Vault share tokens to mint and send to Depositor
+  - Refund unused native gas back to Vault
+    - Vault refunds unused gas tokens to Depositor
 
-    class GMXProcessDeposit {
-      +processDeposit()
-    }
+There are several points in this 2 transaction flow where things may revert, and the Vault will have to be able to handle it accordingly.
 
-    class GMXWithdraw {
-      event WithdrawCreated
-      event WithdrawCompleted
-      event WithdrawCancelled
-      event WithdrawFailed
+- [Before 1st Transaction] If a user's deposit does not meet requirements / checks
+- [Before 1st Transaction] If a user did not send enough execution fee
+- [Before 1st Transaction] If there is not enough lending liquidity to borrow
+- [After 1st Transaction] Deposit to GMX reverted (e.g. due to slippage); considered as a "Desposit Cancellation" by GMX
+- [After 1st Transaction] GMX did not call Vault's callback function or callback function reverted for any reason
+- [After 1st Transaction] `afterDepositChecks()` failed (e.g not enough minimum shares minted)
 
-      +withdraw()
-      +processWithdraw()
-      +processWithdrawCancellation()
-      +processWithdrawFailure()
-      +processWithdrawFailureLiquidityAdded()
-    }
+We have tried to map out the high level and detailed sequences for the various interactions with GMX v2 here: [High level and detailed sequence flows and diagrams are available in `/sequences`](./sequences/)
 
-    class GMXProcessWithdraw {
-      +processWithdraw()
-    }
+## Strategy Vault Contracts Architecture
 
-    class GMXRebalance {
-      event RebalanceSuccess
-      event RebalanceFailed
+Steadefi's vault contracts are architectured using numerous re-usable external libraries that deployed vault contracts must reference to. It is implemented as such as our vaults require more functions and code for various checks and functions to handle various actions (see Strategy Vault Actions table section).
 
-      +rebalanceAdd()
-      +processRebalanceAdd()
-      +processRebalanceAddCancellation()
-      +rebalanceRemove()
-      +processRebalanceRemove()
-      +processRebalanceRemoveCancellation()
-    }
+Our architecture allows us to be able to have these functions while keeping within Solidity's contract size limits. Note that the external libraries are supposed to be re-usable by new strategy vault contracts deployed to GMX v2.
 
-    class GMXCompound {
-      event Compound
-      event CompoundFailed
+A diagram on how these contracts work with one another are as follows:
 
-      +compound()
-      +processCompound()
-      +processCompoundCancellation()
-    }
+![Strategy Vaults Overview](./img/strategy-vaults-overview.png)
 
-    class GMXEmergency {
-      event EmergencyPause
-      event EmergencyResume
-      event EmergencyClose
-      event EmergencyWithdraw
-
-      +emergencyPause()
-      +emergencyResume()
-      +processEmergencyResume()
-      +emergencyClose()
-      +emergencyWithdraw()
-    }
-
-    class GMXReader {
-      +svTokenValue()
-      +pendingFee()
-      +valueToShares()
-      +convertToUsdValue()
-      +tokenWeights()
-      +assetValue()
-      +debtValue()
-      +equityValue()
-      +assetAmt()
-      +debtAmt()
-      +lpAmt()
-      +leverage()
-      +delta()
-      +debtRatio()
-      +additionalCapacity()
-      +capacity()
-    }
-
-    class GMXManager {
-      +calcSwapForRepay()
-      +calcBorrow()
-      +calcRepay()
-      +calcMinMarketSlippageAmt()
-      +calcMinTokensSlippageAmt()
-
-      +borrow()
-      +repay()
-      +addLiquidity()
-      +removeLiquidity()
-      +swapExactTokensForTokens()
-      +swapTokensForExactTokens()
-    }
-
-    class GMXChecks {
-      +beforeNativeDepositChecks()
-      +beforeDepositChecks()
-      +beforeProcessDepositChecks()
-      +afterDepositChecks()
-      +beforeProcessDepositCancellationChecks()
-      +beforeProcessAfterDepositFailureChecks()
-      +beforeProcessAfterDepositFailureLiquidityWithdrawal()
-      +beforeWithdrawChecks()
-      +beforeProcessWithdrawChecks()
-      +afterWithdrawChecks()
-      +beforeProcessWithdrawCancellationChecks()
-      +beforeProcessAfterWithdrawFailureChecks()
-      +beforeProcessAfterWithdrawFailureLiquidityAdded()
-      +beforeRebalanceChecks()
-      +beforeProcessRebalanceChecks()
-      +afterRebalanceChecks()
-      +beforeCompoundChecks()
-      +beforeProcessCompoundChecks()
-      +beforeProcessCompoundCancellationChecks()
-      +beforeEmergencyCloseChecks()
-      +beforeEmergencyResumeChecks()
-      +beforeProcessEmergencyResumeChecks()
-      +beforeEmergencyWithdrawChecks()
-
-      ~_isWithinStepChange()
-    }
-
-    class GMXWorker {
-      +addLiquidity()
-      +removeLiquidity()
-      +swapExactTokensForTokens()
-      +swapTokensForExactTokens()
-    }
-
-    note for GMXTypes "All contracts and libraries inherit
-    Structs and Enums from GMXTypes"
-
-    GMXCallback --> GMXVault
-
-    GMXVault --> GMXDeposit
-    GMXVault --> GMXWithdraw
-    GMXVault --> GMXCompound
-    GMXVault --> GMXRebalance
-    GMXVault --> GMXEmergency
-    GMXVault --> GMXReader
-
-    GMXDeposit --> GMXManager
-    GMXWithdraw --> GMXManager
-    GMXCompound --> GMXManager
-    GMXRebalance --> GMXManager
-    GMXEmergency --> GMXManager
-
-    GMXDeposit --> GMXChecks
-    GMXWithdraw --> GMXChecks
-    GMXCompound --> GMXChecks
-    GMXRebalance --> GMXChecks
-    GMXEmergency --> GMXChecks
-
-    GMXDeposit --> GMXProcessDeposit
-    GMXWithdraw --> GMXProcessWithdraw
-
-    GMXManager --> GMXReader
-    GMXManager --> GMXWorker
-
-```
 
 ## Strategy Vault Actions
 All actions possible to a Strategy Vault and their expected outcome and impact, grouped by access to roles.
@@ -695,159 +278,8 @@ All actions possible to a Strategy Vault and their expected outcome and impact, 
 | Any | additionalCapacity | Returns the amount (in USD value) that the vault can still accept as deposits |
 | Any | capacity | Returns the total capacity of the vault (additionalCapacity + total equity value) |
 
-
 ## Strategy Vault Sequence Diagrams
-High level deposit, withdraw, rebalance add, rebalance remove, compound and emergency flows.
 
+To help illustrate the various flows for key transactions from our Vault to GMXv2, we have created some sequence diagrams:
 
-<details>
-  <summary>
-
-  ### Strategy Vault Deposit Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Deposit Sequence Flow
-  ---
-  flowchart TD
-    F1(deposit) -->|addLiquidity to GMX| S1{Success?}
-    S1{Success?} -->|Yes| F2(afterDepositExecution)
-    S1{Success?} -->|No| F3(afterDepositCancellation)
-
-    F2(afterDepositExecution) --> F4(processDeposit)
-    F4(processDeposit) -->|afterDepositChecks| S2{Success?}
-
-    S2{Success?} -->|Yes| DC[DepositCompleted]
-    S2{Success?} -->|No| DF[DepositFailed]
-
-    DF[DepositFailed] -->|Keeper to call| F5(processDepositFailure)
-    F5(processDepositFailure) --> F6(processDepositFailureLiquidityWithdrawal)
-
-    F3(afterDepositCancellation) --> F7(processDepositCancellation)
-  ```
-</details>
-
-
-<details>
-  <summary>
-
-  ### Strategy Vault Withdraw Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Withdraw Sequence Flow
-  ---
-  flowchart TD
-    F1(deposit) -->|removeLiquidity from GMX| S1{Success?}
-    S1{Success?} -->|Yes| F2(afterWithdrawExecution)
-    S1{Success?} -->|No| F3(afterWithdrawCancellation)
-
-    F2(afterWithdrawExecution) --> F4(processWithdraw)
-    F4(processWithdraw) -->|afterWithdrawChecks| S2{Success?}
-
-    S2{Success?} -->|Yes| DC[WithdrawCompleted]
-    S2{Success?} -->|No| DF[WithdrawFailed]
-
-    DF[WithdrawFailed] -->|Keeper to call| F5(processWithdrawFailure)
-    F5(processWithdrawFailure) --> F6(processWithdrawFailureLiquidityWithdrawal)
-
-    F3(afterWithdrawCancellation) --> F7(processWithdrawCancellation)
-  ```
-</details>
-
-<details>
-  <summary>
-
-  ### Strategy Vault Rebalance Add Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Rebalance Add Sequence Flow
-  ---
-  flowchart TD
-    F1(rebalanceAdd) -->|addLiquidity to GMX| S1{Success?}
-    S1{Success?} -->|Yes| F2(afterDepositExecution)
-    S1{Success?} -->|No| F3(afterDepositCancellation)
-
-    F2(afterDepositExecution) --> F4(processRebalanceAdd)
-    F4(processRebalanceAdd) -->|afterRebalanceChecks| S2{Success?}
-
-    S2{Success?} -->|Yes| DC[RebalanceSuccess]
-    S2{Success?} -->|No| DF[RebalanceOpen]
-
-    F3(afterDepositCancellation) --> F7(processRebalanceAddCancellation)
-```
-</details>
-
-<details>
-  <summary>
-
-  ### Strategy Vault Rebalance Remove Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Rebalance Remove Sequence Flow
-  ---
-  flowchart TD
-    F1(rebalanceRemove) -->|removeLiquidity from GMX| S1{Success?}
-    S1{Success?} -->|Yes| F2(afterDepositExecution)
-    S1{Success?} -->|No| F3(afterDepositCancellation)
-
-    F2(afterDepositExecution) --> F4(processRebalanceRemove)
-    F4(processRebalanceRemove) -->|afterRebalanceChecks| S2{Success?}
-
-    S2{Success?} -->|Yes| DC[RebalanceSuccess]
-    S2{Success?} -->|No| DF[RebalanceOpen]
-
-    F3(afterDepositCancellation) --> F7(processRebalanceRemoveCancellation)
-  ```
-</details>
-
-<details>
-  <summary>
-
-  ### Strategy Vault Compound Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Compound Sequence Flow
-  ---
-  flowchart TD
-    F1(compound) -->|addLiquidity to GMX| S1{Success?}
-    S1{Success?} -->|Yes| F2([afterDepositExecution])
-    S1{Success?} -->|No| F3(afterDepositCancellation)
-
-    F2(afterDepositExecution) --> F4(processCompound)
-    F4(processCompound) --> CS(Compound)
-
-    F3(afterDepositCancellation) --> F7(processCompoundCancellation)
-  ```
-  </details>
-
-<details>
-  <summary>
-
-  ### Strategy Vault Emergency Sequence Flow
-  </summary>
-
-  ```mermaid
-  ---
-  title: GMX Strategy Vault Rebalance Emergency Flow
-  ---
-  flowchart TD
-    F1(emergencyPause) -->|removeLiquidity from GMX| EP[EmergencyPaused]
-
-    EP[EmergencyPaused] --> ER(emergencyResume)
-    ER(emergencyResume) --> F2(afterDepositExecution)
-    F2(afterDepositExecution) --> PER(processEmergencyResume) --> Open
-
-    EP[EmergencyPaused] --> EC(emergencyClose)
-
-    EC(emergencyClose) --> EW(emergencyWithdraw)
-  ```
-</details>
+[High level and detailed sequence flows and diagrams are available in `/sequences`](./sequences/)
