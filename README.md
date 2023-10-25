@@ -1,7 +1,7 @@
 # Steadefi Codehawks Audit
 ​
 <p align="center">
-  <img src="./docs/img/steadefi-logo-light-vertical.png" width="400" alt="Steadefi">
+  <img src="https://res.cloudinary.com/droqoz7lg/image/upload/v1698138813/Steadefi_Vertical_Dark_zqwu7k.png" width="400" alt="Steadefi">
 </p>
 
 ​
