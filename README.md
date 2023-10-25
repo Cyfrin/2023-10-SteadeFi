@@ -8,7 +8,7 @@
 ## Contest Details
 - Total Prize Pool: $35,000
   - High/Medium Awards: $33,000
-  - Low, gas, informational, or QAs Awards: $2,000
+  - Low: $2,000
 - Start: 26th October 2023 12:00pm UTC
 - End: 6th November 2023 12:00pm UTC
 ​
