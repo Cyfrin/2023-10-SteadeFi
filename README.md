@@ -300,4 +300,4 @@ $ forge test --match-test test_createDeposit -vvvv
     - After every action (deposit/withdraw/rebalance/compound), the vault should be cleared of any token balances. Violation of this could allow a subsequent depositor to benefit from it.
 
 ## Additional Known Issues (4nalyzer)
-Additional known issues can be found [here](https://github.com/Cyfrin/2023-10-SteadeFi/files/13173965/report.md)
+Additional known issues can be found [here](https://github.com/Cyfrin/2023-10-SteadeFi/issues/1)
