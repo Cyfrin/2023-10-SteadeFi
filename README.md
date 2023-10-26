@@ -298,3 +298,6 @@ $ forge test --match-test test_createDeposit -vvvv
 - **Main invariants**
     - Assuming a 3X leveraged vault, leverage should never deviate too far from 3. Otherwise, it would imply excessive over or under-borrowing from lending vaults which could result in bad debt
     - After every action (deposit/withdraw/rebalance/compound), the vault should be cleared of any token balances. Violation of this could allow a subsequent depositor to benefit from it.
+
+## Additional Known Issues (4nalyzer)
+Additional known issues can be found [here](https://github.com/Cyfrin/2023-10-SteadeFi/files/13173965/report.md)
