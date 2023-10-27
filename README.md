@@ -39,7 +39,7 @@ There are 2 types of vaults: **Lending Vaults** and **Strategy Vaults**.
 
 A typical set up for 3x Leverage, Delta Long and Delta Neutral strategies to the ETH-USDC GM LP pool on GMXv2, with isolated ETH and USDC lending vaults are as follows:
 
-![Protocol Overview](/docs/img/protocol-overview.png)
+![Protocol Overview](https://res.cloudinary.com/droqoz7lg/image/upload/v1698422767/protocol-overview_k3yank.png)
 
 > Note that Delta Long strategies borrow only USDC for more leverage, while Delta Neutral strategies borrow both USDC for leverage **as well as** borrow ETH in order to delta hedge the ETH exposure of the liquidity provided to the ETH-USDC GM LP pool (borrowing = hedging).
 
