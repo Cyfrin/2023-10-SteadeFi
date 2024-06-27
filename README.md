@@ -1,14 +1,12 @@
-# Steadefi Codehawks Audit
+# Steadefi
 ​
-<p align="center">
-  <img src="https://res.cloudinary.com/droqoz7lg/image/upload/v1698138813/Steadefi_Vertical_Dark_zqwu7k.png" width="400" alt="Steadefi">
-</p>
+[//]: # (contest-details-open)
 
-​
 ## Contest Details
 - Total Prize Pool: $35,000
   - High/Medium Awards: $33,000
   - Low: $2,000
+
 - Start: 26th October 2023 12:00pm UTC
 - End: 6th November 2023 12:00pm UTC
 ​
@@ -57,7 +55,9 @@ A typical set up for 3x Leverage, Delta Long and Delta Neutral strategies to the
 | Keeper | Keepers are automated "bots" that run 24/7, frequently scheduled and/or event-triggered code scripts to perform various protocol maintainence tasks. These tasks include updating of borrow interest rates for Lending Vaults, rebalancing Strategy Vaults whose health are out of its' strategy parameter limits, compounding earned yield for Strategy Vaults, reverting certain issues for strategy vaults when they occur and triggering Emergency Pauses for lending and strategy vaults in the event of any possible issues. |
 | Owner | Owner are administrators that have rights to configure and update various sensitive vault configurations and parameters. Owners of deployed smart-contracts (vaults, oracles, etc.) should be Timelocks of which are managed by Multi-Sigs that require at least a 2 out of 3 signing approval for any transactions to happen with a 24 hours delay. Note that on contract deployment, the immediate Owner is the hot wallet deployer account. After deploying and initial configuration of the contract, the ownership should be immediately transferred from the hot wallet deployer to a Timelock managed by a Multi-Sig. |
 
+[//]: # (contest-details-close)
 
+[//]: # (scope-open)
 
 ## Scope
 ### Contracts in scope:
@@ -144,7 +144,12 @@ Tokens on Avalanche:
   - WETH.e-USDC GM: `0xB7e69749E3d2EDd90ea59A4932EFEa2D41E245d7`
   - SOL-USDC GM: `0xd2eFd1eA687CD78c41ac262B3Bc9B53889ff1F70`
 ​
-## Setup
+[//]: # (scope-close)
+
+[//]: # (getting-started-open)
+
+## Getting Started
+
 Install all project dependencies with yarn
 ```bash
 $ yarn
@@ -267,7 +272,11 @@ $ forge test --match-test test_createDeposit -vvvv
     - Equity = what depositors put into vault
     - Debt = loans from Lending vaults
     - Delta = Refers to the position exposure of this vault's strategy to the underlying volatile asset. Delta can be a negative value.
+
+[//]: # (getting-started-close)
 ​
+[//]: # (known-issues-open)
+
 ## Known Issues
 
 - **Vault inflation attack**
@@ -301,3 +310,5 @@ $ forge test --match-test test_createDeposit -vvvv
 
 ## Additional Known Issues (4nalyzer)
 Additional known issues can be found [here](https://github.com/Cyfrin/2023-10-SteadeFi/issues/1)
+
+[//]: # (known-issues-close)
