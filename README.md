@@ -1,5 +1,6 @@
 # Steadefi
 ​
+
 [//]: # (contest-details-open)
 
 ## Contest Details
