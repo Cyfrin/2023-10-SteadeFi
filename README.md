@@ -1,7 +1,4 @@
 # Steadefi
-​
-
-[//]: # (contest-details-open)
 
 ## Contest Details
 - Total Prize Pool: $35,000
@@ -17,13 +14,14 @@
 - Complexity Score: 1,634
 - Dollars per nSLOC: ~$15
 - Dollars per Complexity: ~$21
-​
+
+​[//]: # (contest-details-open)
+
 ## About
 Steadefi provides vaults with automated risk management for earning leveraged yields effectively and passively in bull, crab and bear markets. With lending and leveraged delta long and neutral stategies, Steadefi's vaults cater to different risk/reward strategies to the best yield-generating DeFi protocols.
 
 As of October 2023, Steadefi is looking to launch vaults that earn yield from GMX v2 on Arbitrum and Avalanche network.
 ​
-
 ## Official Links
 - [Protocol Documentation](https://docs.steadefi.com)
 - [Website](https://www.steadefi.com)
